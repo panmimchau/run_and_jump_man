@@ -2,6 +2,44 @@ import pygame
 from sys import exit
 from random import randint
 
+#classes
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__() #initializing the Sprite class inside Player class
+        player_walk_1 = pygame.image.load('graphics/szom-right1.png').convert_alpha()
+        player_walk_2 = pygame.image.load('graphics/szom-right2.png').convert_alpha()
+        self.player_walk = [player_walk_1,player_walk_2]
+        self.player_index = 0
+
+        self.image = self.player_walk[self.player_index]
+        self.rect = self.image.get_rect(midbottom = (200,300))
+        self.gravity = 0
+
+    def player_input(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE] and self.rect.bottom >= 420:
+            self.gravity = -20
+
+    def apply_gravity(self):
+        self.gravity += 1
+        self.rect.y += self.gravity
+        if self.rect.bottom >= 420:
+            self.rect.bottom = 420
+
+    def animation_state(self):
+        #TODO
+        #if self.rect.bottom < 420:
+            #self.image = self.player_jump
+        #else:
+        self.player_index += 0.1 #it takes a couple of frames to get to walk_2
+        if self.player_index >= len(self.player_walk):self.player_index = 0
+        self.image = self.player_walk[int(self.player_index)]
+
+    def update(self):
+        self.player_input()
+        self.apply_gravity()
+    
+
 def display_score():
     current_time = int(pygame.time.get_ticks() / 1000) - start_time
     score_surf = test_font.render(f'Score: {current_time}',False,(64,64,64))
@@ -41,7 +79,7 @@ def player_animation():
 
 pygame.init() #start pygame
 #initiate screen
-screen = pygame.display.set_mode((800,500)) #width,height
+screen = pygame.display.set_mode((800,500))
 pygame.display.set_caption('szymo_jump')
 clock = pygame.time.Clock() #helps with time and framerate
 test_font = pygame.font.Font("fonts/DiabloHeavy.ttf", 50) #font type, font size
@@ -49,8 +87,8 @@ game_active = False
 start_time = 0
 score = 0
 
-#test_surf = pygame.surf((100,200)) #w,h
-#test_surf.fill('Green')
+player = pygame.sprite.GroupSingle() #needs to be in seperate group than obsticles
+player.add(Player())
 
 background_surf = pygame.image.load('graphics/hills.jpg').convert_alpha() #.convert() - pygame can work with imported images more easely
 ground_surf = pygame.image.load('graphics/ground.png').convert_alpha()
@@ -59,8 +97,20 @@ ground_surf = pygame.image.load('graphics/ground.png').convert_alpha()
 #score_rect = score_surf.get_rect(center = (400, 50))
 
 #obstancles
-dino_surf = pygame.image.load("graphics/dino.png").convert_alpha()
-tax_surf = pygame.image.load('graphics/tax.png').convert_alpha()
+
+#dino
+dino_frame_1 = pygame.image.load("graphics/dino1.png").convert_alpha()
+dino_frame_2 = pygame.image.load("graphics/dino2.png").convert_alpha()
+dino_frames = [dino_frame_1,dino_frame_2]
+dino_frame_index = 0
+dino_surf = dino_frames[dino_frame_index]
+
+#tax
+tax_frame_1 = pygame.image.load('graphics/tax1.png').convert_alpha()
+tax_frame_2 = pygame.image.load('graphics/tax2.png').convert_alpha()
+tax_frames = [tax_frame_1,tax_frame_2]
+tax_frame_index = 0
+tax_surf = tax_frames[tax_frame_index]
 
 obstacle_rect_list = []
 
@@ -89,6 +139,12 @@ game_message_rect = game_message.get_rect(center = (400,360))
 obstacle_timer = pygame.USEREVENT + 1 #+1 - some events reserved for pygame, so we need to add 1
 pygame.time.set_timer(obstacle_timer,1000) #obstacles will show up every 900ms
 
+dino_animation_timer = pygame.USEREVENT + 2
+pygame.time.set_timer(dino_animation_timer,500)
+
+tax_animation_timer = pygame.USEREVENT + 3
+pygame.time.set_timer(tax_animation_timer,200)
+
 while True:
     #event loop - checking for player inpute
     for event in pygame.event.get():
@@ -112,13 +168,22 @@ while True:
                 #dino_rect.left = 800
                 start_time = int(pygame.time.get_ticks() / 1000)
 
-        if event.type == obstacle_timer and game_active:
-            if randint(0,2):
-                obstacle_rect_list.append(dino_surf.get_rect(midbottom = (randint(900,1100),420))) #position of obstacles
-            else:
-                obstacle_rect_list.append(tax_surf.get_rect(midbottom = (randint(900,1100),210)))
+        if game_active:
+            if event.type == obstacle_timer and game_active:
+                if randint(0,2):
+                    obstacle_rect_list.append(dino_surf.get_rect(midbottom = (randint(900,1100),420))) #position of obstacles
+                else:
+                    obstacle_rect_list.append(tax_surf.get_rect(midbottom = (randint(900,1100),210)))
 
+            if event.type == dino_animation_timer: #animation timer for dino
+                if dino_frame_index == 0: dino_frame_index = 1
+                else: dino_frame_index = 0
+                dino_surf = dino_frames[dino_frame_index]
 
+            if event.type == tax_animation_timer: #animation timer for tax
+                if tax_frame_index == 0: tax_frame_index = 1
+                else: tax_frame_index = 0
+                tax_surf = tax_frames[tax_frame_index]    
 
     #draw all elements
     #update everything
@@ -143,6 +208,9 @@ while True:
         if player_rect.bottom >= 420: player_rect.bottom = 420 #"creates" a ground for player to stand on
         player_animation()
         screen.blit(player_surf,player_rect)
+        #sprite groups have 2  functions
+        player.draw(screen) #draw sprites
+        player.update() #update sprites
 
         #obstancle movement
         obstacle_rect_list = obstacle_movement(obstacle_rect_list)

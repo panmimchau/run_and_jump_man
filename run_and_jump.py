@@ -1,6 +1,6 @@
 import pygame
 from sys import exit
-from random import randint
+from random import randint, choice
 
 #classes
 class Player(pygame.sprite.Sprite):
@@ -12,13 +12,17 @@ class Player(pygame.sprite.Sprite):
         self.player_index = 0
 
         self.image = self.player_walk[self.player_index]
-        self.rect = self.image.get_rect(midbottom = (200,300))
+        self.rect = self.image.get_rect(midbottom = (80,300))
         self.gravity = 0
+
+        self.jump_sound = pygame.mixer.Sound('sounds/jump.wav')
+        self.jump_sound.set_volume(0.1) #0-1
 
     def player_input(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_SPACE] and self.rect.bottom >= 420:
             self.gravity = -20
+            self.jump_sound.play()
 
     def apply_gravity(self):
         self.gravity += 1
@@ -38,7 +42,40 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         self.player_input()
         self.apply_gravity()
+        self.animation_state()
     
+class Obstacle(pygame.sprite.Sprite):
+    def __init__(self,type):
+        super().__init__()
+
+        if type == 'tax':
+            tax_1 = pygame.image.load('graphics/tax1.png').convert_alpha()
+            tax_2 = pygame.image.load('graphics/tax2.png').convert_alpha()
+            self.frames = [tax_1,tax_2]
+            y_pos = 210
+        else:
+            dino_1 = pygame.image.load("graphics/dino1.png").convert_alpha()
+            dino_2 = pygame.image.load("graphics/dino2.png").convert_alpha()
+            self.frames = [dino_1,dino_2]
+            y_pos = 420
+
+        self.animation_index = 0
+        self.image = self.frames[self.animation_index]
+        self.rect = self.image.get_rect(midbottom = (randint(900,1100),y_pos))
+
+    def animation_state(self):
+        self.animation_index += 0.1
+        if self.animation_index >= len(self.frames): self.animation_index = 0
+        self.image = self.frames[int(self.animation_index)]
+
+    def update(self):
+        self.animation_state()
+        self.rect.x -= 5
+        self.destroy()
+
+    def destroy(self):
+        if self.rect.x <= -100:
+            self.kill()
 
 def display_score():
     current_time = int(pygame.time.get_ticks() / 1000) - start_time
@@ -64,7 +101,13 @@ def collisions(player,obstacles):
     if obstacles:
         for obstacle_rect in obstacles:
             if player.colliderect(obstacle_rect): return False
-    return True        
+    return True       
+
+def collision_sprite():
+    if pygame.sprite.spritecollide(player.sprite,obstacle_group,False):
+        obstacle_group.empty()
+        return False
+    else: return True
 
 def player_animation():
     global player_surf, player_index
@@ -76,7 +119,6 @@ def player_animation():
         if player_index >= len(player_walk):player_index = 0
         player_surf = player_walk[int(player_index)]
 
-
 pygame.init() #start pygame
 #initiate screen
 screen = pygame.display.set_mode((800,500))
@@ -86,9 +128,14 @@ test_font = pygame.font.Font("fonts/DiabloHeavy.ttf", 50) #font type, font size
 game_active = False
 start_time = 0
 score = 0
+bg_music = pygame.mixer.Sound('sounds/main.wav')
+bg_music.play(loops = -1) # -1 - loops track forever
 
+#groups
 player = pygame.sprite.GroupSingle() #needs to be in seperate group than obsticles
 player.add(Player())
+
+obstacle_group = pygame.sprite.Group()
 
 background_surf = pygame.image.load('graphics/hills.jpg').convert_alpha() #.convert() - pygame can work with imported images more easely
 ground_surf = pygame.image.load('graphics/ground.png').convert_alpha()
@@ -170,10 +217,11 @@ while True:
 
         if game_active:
             if event.type == obstacle_timer and game_active:
-                if randint(0,2):
-                    obstacle_rect_list.append(dino_surf.get_rect(midbottom = (randint(900,1100),420))) #position of obstacles
-                else:
-                    obstacle_rect_list.append(tax_surf.get_rect(midbottom = (randint(900,1100),210)))
+                obstacle_group.add(Obstacle(choice(['tax', 'dino', 'dino', 'dino']))) #will pick one of items from list; 75% te pick dino
+                #if randint(0,2):
+                #    obstacle_rect_list.append(dino_surf.get_rect(midbottom = (randint(900,1100),420))) #position of obstacles
+                #else:
+                #    obstacle_rect_list.append(tax_surf.get_rect(midbottom = (randint(900,1100),210)))
 
             if event.type == dino_animation_timer: #animation timer for dino
                 if dino_frame_index == 0: dino_frame_index = 1
@@ -203,17 +251,21 @@ while True:
 
         #player
         #print(player_rect.left) #prints exact position of left side of rectangle
-        player_gravity += 1
-        player_rect.y += player_gravity
-        if player_rect.bottom >= 420: player_rect.bottom = 420 #"creates" a ground for player to stand on
-        player_animation()
-        screen.blit(player_surf,player_rect)
+        #player_gravity += 1
+        #player_rect.y += player_gravity
+        #if player_rect.bottom >= 420: player_rect.bottom = 420 #"creates" a ground for player to stand on
+        #player_animation()
+        #screen.blit(player_surf,player_rect)
         #sprite groups have 2  functions
         player.draw(screen) #draw sprites
         player.update() #update sprites
 
+        obstacle_group.draw(screen)
+        obstacle_group.update()
+
         #obstancle movement
-        obstacle_rect_list = obstacle_movement(obstacle_rect_list)
+        #obstacle_rect_list = obstacle_movement(obstacle_rect_list)
+        #obstacle_group.update()
 
         #keyboard input
         #keys = pygame.key.get_pressed()
@@ -221,9 +273,10 @@ while True:
         #    print("jump")
 
         #collisions
+        game_active = collision_sprite()
         #if dino_rect.colliderect(player_rect):
         #   game_active = False
-        game_active = collisions(player_rect,obstacle_rect_list) #returns True or False
+        #game_active = collisions(player_rect,obstacle_rect_list) #returns True or False
 
     else:
         screen.fill((94,129,162))

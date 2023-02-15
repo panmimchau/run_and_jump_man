@@ -245,7 +245,7 @@ while True:
         if game_active:
             if event.type == obstacle_timer and game_active:
                 obstacle_group.add(
-                    Obstacle(choice(["tax", "dino", "dino", "dino"]))
+                    Obstacle(choice(["tax", "dino", "dino"]))
                 )  # will pick one of items from list; 75% te pick dino
                 # if randint(0,2):
                 #    obstacle_rect_list.append(dino_surf.get_rect(midbottom = (randint(900,1100),420))) #position of obstacles
